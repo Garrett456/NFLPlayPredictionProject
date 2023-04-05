@@ -1,0 +1,26 @@
+{
+    "id": "4D7028BE",
+    "path": "~/Desktop/GitHub/NFLPlayPredictionProject/raw-data/more_cleaning.R",
+    "project_path": "raw-data/more_cleaning.R",
+    "type": "r_source",
+    "hash": "640022761",
+    "contents": "",
+    "dirty": false,
+    "created": 1680716974722.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "59,0",
+        "scrollLine": "41"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1680717158,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1680717158379,
+    "read_only": false,
+    "read_only_alternatives": []
+}
