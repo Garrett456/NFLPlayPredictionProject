@@ -1,0 +1,3 @@
+"0","run_pass_df <- run_pass_df %>%"
+"0","  mutate(num_pass_per_game = as.double(round(pass_count/16, 2) )) %>%"
+"0","  mutate(num_run_per_game = as.double(round(run_count/16, 2) ) )"

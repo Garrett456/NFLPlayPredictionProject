@@ -1,0 +1,5 @@
+"0","data1 <- data %>%"
+"0","  group_by(game) %>%"
+"0","  summarise(count= n()) %>%"
+"0","  filter(grepl('bears_at_vikings_2022_reg_5', game))"
+"0",""

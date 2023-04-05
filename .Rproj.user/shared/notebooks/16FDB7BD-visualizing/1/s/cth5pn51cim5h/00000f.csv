@@ -1,0 +1,10 @@
+"0","team_colors <- nflreadr::load_teams()"
+"2","Note: nflreadr caches (i.e., stores a saved version) data by default.
+If you expect different output try one of the following:
+[34mℹ[39m Restart your R Session or
+[34mℹ[39m Run `nflreadr::.clear_cache()`.
+To disable this warning, run `options(nflreadr.verbose = FALSE)` or add it to your .Rprofile"
+"0","team_colors <- team_colors %>%"
+"0","  select( c(""team_abbr"", ""team_color"") )"
+"0",""
+"0","d <- inner_join(d, team_colors, by= c(""possession_abbr""=""team_abbr""))"

@@ -1,0 +1,3 @@
+"0","data <- read.csv(""/Users/garrett/Desktop/GitHub/NFLPlayPredictionProject/raw-data/games_pbp.csv"")"
+"0","view(data)"
+"0","#str(data)"

@@ -1,0 +1,2 @@
+"0","d <- d %>% "
+"0","  mutate(bar_color = ifelse(run_pass == ""run"", team_color, ""grey""))"
