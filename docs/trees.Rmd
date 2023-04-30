@@ -1,0 +1,88 @@
+---
+title: "Decision Tree"
+author: "Garrett Marshall"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r message=FALSE}
+library(NFLPlayPredictionProject)
+library(tidyverse)
+library(lubridate)
+library(caret)
+library(glmnet)
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+data_1 <- games_pbp
+```
+
+```{r}
+data_1$time_period <- ms(data_1$time)
+
+data_1$time_seconds <- as.numeric(data_1$time_period, "seconds")
+
+data_1$adjusted_time_seconds <- ifelse(data_1$quarter == 1, data_1$time_seconds + 45 * 60,
+                                     ifelse(data_1$quarter == 2, data_1$time_seconds + 30 * 60,
+                                            ifelse(data_1$quarter == 3, data_1$time_seconds + 15 * 60, data_1$time_seconds)))
+
+data_1$adjusted_time_period <- seconds_to_period(data_1$adjusted_time_seconds)
+
+data_1$adjusted_time <- format(data_1$adjusted_time_period, "%M:%S")
+
+d_1 <- data_1 %>%
+  mutate( time = adjusted_time_period ) %>%
+  select( -c('time_period', 'time_seconds', 'adjusted_time_seconds', 'adjusted_time_period', 'adjusted_time') )
+
+d_1 <- d_1 %>% select( -c('game', 'possession_team', 'possession_abbr') )
+
+d_1$yards_to_first <- as.numeric(d_1$yards_to_first)
+d_1$yards_to_endzone <- as.numeric(d_1$yards_to_endzone)
+d_1$quarter <- as.numeric(d_1$quarter)
+d_1$shotgun <- as.numeric(d_1$shotgun)
+d_1$down <- as.numeric(d_1$down)
+```
+
+```{r}
+# pass == 1
+# run == 2
+#d_1$run_pass <- as.numeric(d_1$run_pass)
+
+#d_1$run_pass <- as.factor(ifelse(d_1$run_pass == 'pass', 1, -1))
+
+```
+
+```{r}
+
+# Split the dataset into training and test sets
+set.seed(1234)
+split <- sample.split(d_1$run_pass, SplitRatio = 0.8)
+train <- subset(d_1, split == TRUE)
+test <- subset(d_1, split == FALSE)
+```
+
+
+```{r}
+prop.table(table(train$run_pass))
+prop.table(table(test$run_pass))
+```
+
+
+```{r}
+fit <- rpart( run_pass ~ quarter+time+shotgun+down+yards_to_first+yards_to_endzone, data = train, method = 'class', control = rpart.control("minsplit" = 5))
+
+fit
+```
+
+```{r}
+rpart.plot(fit, extra = 106)
+```
+
+
+
+
+
+
+

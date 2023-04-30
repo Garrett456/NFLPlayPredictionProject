@@ -1,3 +1,0 @@
-"0","data <- read.csv(""/Users/garrett/Desktop/games_pbp.csv"")"
-"0","view(data)"
-"0","#str(data)"

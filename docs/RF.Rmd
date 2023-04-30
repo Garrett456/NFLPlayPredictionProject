@@ -1,0 +1,399 @@
+---
+title: "Random Forests"
+author: "Garrett Marshall"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r message=FALSE}
+library(NFLPlayPredictionProject)
+library(tidyverse)
+library(lubridate)
+library(caret)
+library(randomForest)
+library(glmnet)
+library(e1071)
+library(caTools)
+```
+
+```{r}
+data <- games_pbp
+data_1 <- games_pbp
+```
+
+```{r}
+data_1$time_period <- ms(data_1$time)
+
+data_1$time_seconds <- as.numeric(data_1$time_period, "seconds")
+
+data_1$adjusted_time_seconds <- ifelse(data_1$quarter == 1, data_1$time_seconds + 45 * 60,
+                                     ifelse(data_1$quarter == 2, data_1$time_seconds + 30 * 60,
+                                            ifelse(data_1$quarter == 3, data_1$time_seconds + 15 * 60, data_1$time_seconds)))
+
+data_1$adjusted_time_period <- seconds_to_period(data_1$adjusted_time_seconds)
+
+data_1$adjusted_time <- format(data_1$adjusted_time_period, "%M:%S")
+
+d_1 <- data_1 %>%
+  mutate( time = adjusted_time_period ) %>%
+  select( -c('time_period', 'time_seconds', 'adjusted_time_seconds', 'adjusted_time_period', 'adjusted_time') )
+
+d_1 <- d_1 %>% select( -c('game', 'possession_team', 'possession_abbr') )
+
+d_1$yards_to_first <- as.numeric(d_1$yards_to_first)
+d_1$yards_to_endzone <- as.numeric(d_1$yards_to_endzone)
+```
+
+
+```{r}
+data$time_period <- ms(data$time)
+
+data$time_seconds <- as.numeric(data$time_period, "seconds")
+
+data$adjusted_time_seconds <- ifelse(data$quarter == 1, data$time_seconds + 45 * 60,
+                                     ifelse(data$quarter == 2, data$time_seconds + 30 * 60,
+                                            ifelse(data$quarter == 3, data$time_seconds + 15 * 60, data$time_seconds)))
+
+data$adjusted_time_period <- seconds_to_period(data$adjusted_time_seconds)
+
+data$adjusted_time <- format(data$adjusted_time_period, "%M:%S")
+
+d <- data %>%
+  mutate( time = adjusted_time ) %>%
+  select( -c('time_period', 'time_seconds', 'adjusted_time_seconds', 'adjusted_time_period', 'adjusted_time') )
+
+d <- d %>%
+  mutate( time = as.numeric(as.duration(time), unit = "secs"))
+
+d <- d %>% select( -c('game', 'possession_team', 'possession_abbr') )
+
+d$yards_to_first <- as.numeric(d$yards_to_first)
+d$yards_to_endzone <- as.numeric(d$yards_to_endzone)
+```
+
+
+```{r}
+d_1 <- d_1 %>%
+  mutate( down_yards_to_first = yards_to_first * as.numeric(down)) %>%
+  mutate( down_yards_to_first_shotgun = down_yards_to_first * as.numeric(shotgun))
+```
+
+
+```{r}
+# Split the dataset into training and test sets
+set.seed(1245)
+split <- sample.split(d_1$run_pass, SplitRatio = 0.7)
+train <- subset(d_1, split == TRUE)
+test <- subset(d_1, split == FALSE)
+```
+
+```{r}
+trControl <- trainControl(method = "cv",
+    number = 10,
+    search = "grid")
+
+trControl_1 <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 5,
+                              search = "random")
+```
+
+
+```{r}
+# Search best mtry
+# test the model with values of mtry from 1 to 10
+set.seed(123456)
+
+tuneGrid <- expand.grid(.mtry = c(1:5))
+
+rf_mtry <- train(run_pass ~ quarter+time+shotgun+down+yards_to_first+yards_to_endzone+ 
+                   yards_to_first_down+yards_to_first_down_shotgun,
+    data = train,
+    method = "rf",
+    metric = "Accuracy",
+    tuneGrid = tuneGrid,
+    trControl = trControl,
+    importance = TRUE,
+    nodesize = 10,
+    ntree = 100 )
+print(rf_mtry)
+```
+
+```{r}
+max(rf_mtry$results$Accuracy)
+
+best_mtry <- rf_mtry$bestTune$mtry 
+best_mtry
+```
+
+```{r}
+set.seed(12349)
+tuneGrid <- expand.grid(.mtry = 3)
+
+rf_2 <- train(run_pass ~ quarter+time+shotgun+down+yards_to_first+yards_to_endzone,
+    data = train,
+    method = "rf",
+    metric = "Accuracy",
+    tuneGrid = tuneGrid,
+    trControl = trControl,
+    importance = TRUE,
+    nodesize = 10,
+    ntree = 10 )
+print(rf_2)
+```
+
+
+
+```{r}
+set.seed(1234780)
+tuneGrid <- expand.grid(.mtry = 3)
+
+rf <- train(run_pass ~ quarter+time+shotgun+down+yards_to_first+yards_to_endzone,
+    data = train,
+    method = "rf",
+    metric = "Accuracy",
+    tuneGrid = tuneGrid,
+    trControl = trControl,
+    importance = TRUE,
+    nodesize = 10,
+    ntree = 10 )
+print(rf)
+```
+
+```{r}
+preds <- predict(rf, test)
+
+cm <- confusionMatrix(preds, test$run_pass)
+ 
+lol <- as.numeric(cm$overall[1])
+```
+
+```{r}
+df<- varImp(rf_2)
+
+df<- df$importance
+df$feature <- row.names(df)
+df$temp <- df$run
+df.45 <- df %>% select( -c('pass', 'run') )
+df.45
+```
+
+
+```{r}
+df2<- varImp(rf)
+
+df2<- df2$importance
+df2$feature <- row.names(df2)
+df2$importance <- df2$run
+df2 <- df2 %>% select( -c('pass', 'run') )
+df2
+var_imp_data <- df2[0, ]
+```
+
+```{r}
+df.45 <- full_join(df.45, df2, by = "feature")
+df.45
+```
+
+
+
+```{r}
+ggplot(varImp(rf))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Split the dataset into training and test sets
+set.seed(1200)
+split <- sample.split(d_1$run_pass, SplitRatio = 0.75)
+train_1 <- subset(d_1, split == TRUE)
+test_1 <- subset(d_1, split == FALSE)
+```
+
+```{r}
+# Set training control
+train_control <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 5,
+                              search = "random")
+
+train_control_1 <- trainControl(method = "cv",
+    number = 10,
+    search = "grid")
+```
+
+
+```{r}
+# Train the model
+elastic_net_model <- train(run_pass ~ quarter+time+shotgun+down+yards_to_first+yards_to_endzone+ down_yards_to_first+down_yards_to_first_shotgun,
+                           data = train_1,
+                           method = "glmnet",
+                           preProcess = c("center", "scale"),
+                           tuneLength = 25,
+                           trControl = train_control
+                           )
+
+```
+
+
+```{r}
+# Check multiple R-squared
+preds_enet <- predict(elastic_net_model, test_1)
+
+confusionMatrix(preds_enet, test_1$run_pass)
+```
+
+```{r}
+
+```
+
+
+
+ITERATE THROUGH MODELS!!!
+
+```{r}
+
+var_imp_data <- df2[0, ]
+accuracy_list <- list()
+
+for ( i in 1:10 ){
+  
+  current_seed <- 51307 + i
+  set.seed(current_seed)
+  
+  split <- sample.split(d_1$run_pass, SplitRatio = 0.8)
+  train <- subset(d_1, split == TRUE)
+  test <- subset(d_1, split == FALSE)
+  
+  trControl_1 <- trainControl(method = "repeatedcv",
+                                number = 10,
+                                repeats = 5,
+                                search = "random")
+  
+  set.seed(current_seed)
+  tuneGrid <- expand.grid(.mtry = 3)
+  
+  rf_final <- train(run_pass ~ quarter+time+shotgun+down+yards_to_first+yards_to_endzone+
+                      down_yards_to_first+down_yards_to_first_shotgun,
+      data = train,
+      method = "rf",
+      metric = "Accuracy",
+      tuneGrid = tuneGrid,
+      trControl = trControl_1,
+      importance = TRUE,
+      nodesize = 10,
+      ntree = 100 )
+  
+  preds <- predict(rf_final, test)
+  
+  cm <- confusionMatrix(preds, test$run_pass)
+  
+  accuracy <- as.numeric(cm$overall[1])
+  
+  accuracy_list <- append(accuracy_list, accuracy)
+  
+  
+  temp_df <- varImp(rf_final)
+  temp_df <- temp_df$importance
+  temp_df$feature <- row.names(temp_df)
+  temp_df$importance <- temp_df$run
+  temp_df <- temp_df %>% select( -c('pass', 'run') )
+  
+  var_imp_data <- full_join(var_imp_data, temp_df, by = "feature")
+  
+  i <- i+1
+}
+```
+
+```{r}
+var_imp_data
+
+accuracy_list
+```
+
+```{r}
+acc_df <- as.data.frame(accuracy_list)
+rowMeans(acc_df)
+```
+
+```{r}
+var_imp_data_1 <- var_imp_data %>% select( -c('importance.x') )
+```
+
+```{r}
+colnames(var_imp_data_1)
+```
+
+
+
+
+```{r}
+var_imp_data_1$means <- rowMeans(var_imp_data_1[,2:10])
+#var_imp_data$error <- std.error(var_imp_data[,2:10])
+
+var_imp_data_1
+```
+
+
+
+```{r}
+var_imp_data_1 <- var_imp_data_1 %>% arrange(desc(means))
+```
+
+```{r}
+var_imp_data_1$sd <- apply(var_imp_data_1[,-1], MARGIN = 1, FUN = sd, na.rm = FALSE)
+
+
+```
+
+```{r}
+var_imp_data_1
+```
+
+
+
+```{r fig.height=5, fig.width=8}
+importance_plot <- ggplot(var_imp_data_1, aes(y = reorder(feature, means), x = means) ) +
+  geom_bar(stat="identity", fill = "#0B610A", color = "black" ) +
+  #geom_errorbar(aes(ymin = means - sd, ymax = means + sd ), width=.2) + 
+  labs( title = "Variable Importance",
+        x = "Mean Variable Importance",
+        y = "Feature in Model" ) +
+  theme_bw() +
+  theme(plot.title = element_text(face="bold", size=16), 
+        axis.title.x = element_text(face="bold"),
+        axis.title.y = element_text(face="bold"),
+        axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"),
+        #panel.grid.major = element_blank(),
+        #panel.grid.minor = element_blank(),
+        # Remove panel background
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent', color=NA) ) +
+  theme(axis.text.y = element_text( angle = 30 ) ) +
+  scale_y_discrete(labels=c("down_yards_to_first_shotgun" = "down:yards_to_first:shotgun", "down_yards_to_first" = "down:yards_to_first"))
+
+importance_plot
+```
+
+```{r}
+ggsave('/Users/garrett/Desktop/var_imp.tiff', importance_plot, bg='transparent', 
+       width = 24, height = 13, units = "in", scale = .375, dpi = 500 )
+```
+
+
+
